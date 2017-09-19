@@ -27,6 +27,9 @@ RUN buildDeps="sudo make gcc g++ libc-dev ruby-dev libffi-dev" \
     && gem sources --clear-all \
     && rm -rf /tmp/* /var/tmp/* /usr/lib/ruby/gems/*/cache/*.gem
 
+RUN apt-get update
+RUN apt-get -y install vim less
+
 # Copy configuration files
 COPY ./conf/fluent.conf /fluentd/etc/
 COPY ./conf/systemd.conf /fluentd/etc/
