@@ -14,7 +14,6 @@ RUN buildDeps="sudo make gcc g++ libc-dev ruby-dev libffi-dev" \
      -y --no-install-recommends \
      $buildDeps \
     && echo 'gem: --no-document' >> /etc/gemrc \
-    && gem install fluent-plugin-secure-forward \
     && gem install fluent-plugin-record-reformer \
     && gem install fluent-plugin-kubernetes_metadata_filter \
     && gem install ffi \
@@ -28,7 +27,7 @@ RUN buildDeps="sudo make gcc g++ libc-dev ruby-dev libffi-dev" \
     && rm -rf /tmp/* /var/tmp/* /usr/lib/ruby/gems/*/cache/*.gem
 
 RUN apt-get update
-RUN apt-get -y install vim less
+RUN apt-get -y install vim
 
 # Copy configuration files
 COPY ./conf/fluent.conf /fluentd/etc/
