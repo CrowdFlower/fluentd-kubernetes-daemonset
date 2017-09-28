@@ -50,13 +50,17 @@ pipeline {
                       docker tag ${ECR_URL}/fluentd ${ECR_URL}/fluentd:${ALT_TAG}
                       docker push ${ECR_URL}/fluentd:${ALT_TAG}
                   """
-                  qe_envs = ['00', '01', '02', '03', '04', '05']
-                  qe_envs.each { num ->
-                    sh """
-                        docker tag ${ECR_URL}/fluentd ${ECR_URL}/fluentd:qe${num}
-                        docker push ${ECR_URL}/fluentd:qe${num}
-                    """
+                  /* Tag latest build for qe0*
+                  script {
+                      qe_nums = ['00', '01', '02', '03', '04', '05']
+                      qe_nums.each { num ->
+                        sh """
+                            docker tag ${ECR_URL}/fluentd ${ECR_URL}/fluentd:qe${num}
+                            docker push ${ECR_URL}/fluentd:qe${num}
+                        """
+                      }
                   }
+                  */
             }
         }
     }
