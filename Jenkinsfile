@@ -50,6 +50,13 @@ pipeline {
                       docker tag ${ECR_URL}/fluentd ${ECR_URL}/fluentd:${ALT_TAG}
                       docker push ${ECR_URL}/fluentd:${ALT_TAG}
                   """
+                  qe_envs = ['00', '01', '02', '03', '04', '05']
+                  qe_envs.each { num ->
+                    sh """
+                        docker tag ${ECR_URL}/fluentd ${ECR_URL}/fluentd:qe${num}
+                        docker push ${ECR_URL}/fluentd:qe${num}
+                    """
+                  }
             }
         }
     }
@@ -65,7 +72,7 @@ pipeline {
                 subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: """
                 <p>FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
-                <p>Check console output at &QUOT;<a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>&QUOT;</p>
+                <p>Check console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a></p>
                 """,
                 recipientProviders: [[$class: 'DevelopersRecipientProvider']]
             )
