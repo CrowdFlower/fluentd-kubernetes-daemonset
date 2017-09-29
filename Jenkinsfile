@@ -72,7 +72,7 @@ pipeline {
 
         failure {
             emailext (
-                to: 'keith.woody@crowdflower.com',
+                to: 'engineers@crowdflower.com',
                 subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: """
                 <p>FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
