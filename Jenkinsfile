@@ -4,7 +4,7 @@ pipeline {
     environment {
         ECR_URL = "411719562396.dkr.ecr.us-east-1.amazonaws.com"
         APP_TAG = ""
-        ALT_TAG = "${env.BUILD_NUMBER}"
+        ALT_TAG = "build${env.BUILD_NUMBER}"
         GIT_COMMIT = ""
     }
 
