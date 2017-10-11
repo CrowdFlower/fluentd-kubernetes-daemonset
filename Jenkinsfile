@@ -91,11 +91,8 @@ pipeline {
     failure {
       emailext (
         to: "${ERROR_EMAIL}",
-        subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
-        body: """
-        <p>FAILED: Jenkins Job '${JOB_NAME} [${BUILD_NUMBER}]'</p>
-        <p>Check console output at <a href='${BUILD_URL}'>${BUILD_URL}</a></p>
-        """,
+        subject: "${currentBuild.currentResult}: ${currentBuild.fullDisplayName} - template html-with-health-and-console.jelly",
+        body: '''${JELLY_SCRIPT,template="html-with-health-and-console"}''',
         recipientProviders: [[$class: 'DevelopersRecipientProvider']]
       )
     }
