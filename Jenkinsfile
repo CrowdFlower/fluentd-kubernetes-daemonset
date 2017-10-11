@@ -1,85 +1,103 @@
 pipeline {
-    agent { label 'docker' }
+  agent { label 'docker' }
 
-    environment {
-        ECR_URL = "411719562396.dkr.ecr.us-east-1.amazonaws.com"
-        APP_TAG = ""
-        ALT_TAG = "build${env.BUILD_NUMBER}"
-        GIT_COMMIT = ""
+  options {
+    buildDiscarder(logRotator(artifactDaysToKeepStr: '1', artifactNumToKeepStr: '1', daysToKeepStr: '1', numToKeepStr: '1'))
+  }
+
+  environment {
+    IMAGE_NAME = 'fluentd'
+    BRANCH_BUILD_TAG = "${BRANCH_NAME.replace('/','-')}-${BUILD_NUMBER}"
+    GIT_SHA7 = "${GIT_COMMIT[0..6]}"
+    TIMESTAMP = "${new Date(currentBuild.startTimeInMillis).format("yyMMddHHmm")}"
+    DATE_SHA_TAG = "v0.12-debian-nfs-$TIMESTAMP-$GIT_SHA7"
+    ECR_URL = '411719562396.dkr.ecr.us-east-1.amazonaws.com'
+    IMAGE_REPO = "$ECR_URL/$IMAGE_NAME"
+    CURRENT_BUILD_IMAGE_NAME = "$IMAGE_REPO:$BRANCH_BUILD_TAG"
+    TIMESTAMPED_IMAGE_NAME = "$IMAGE_REPO:$DATE_SHA_TAG"
+    ERROR_EMAIL = 'engineers@crowdflower.com'
+  }
+
+  stages {
+    stage('Set error email') {
+      when { expression { env.BRANCH_NAME != 'master' } }
+      steps {
+        script {
+          ERROR_EMAIL = sh(returnStdout: true, script: "git --no-pager show -s --format='%ae' ${GIT_COMMIT}")
+        }
+        echo "Send topic branch build errors to commit author ${ERROR_EMAIL}"
+      }
     }
 
-    options {
-        timestamps() // timestamp console output in Jenkins
-        buildDiscarder(logRotator(artifactDaysToKeepStr: '1',
-                                  artifactNumToKeepStr: '1',
-                                  daysToKeepStr: '1',
-                                  numToKeepStr: '1'))
+    stage('Build and tag image') {
+      parallel {
+        stage('Clean up dangling images and containers') {
+          steps {
+            sh """
+              set +e
+              docker rm \$(docker ps -a -f status=exited -q) 2>/dev/null
+              docker rm \$(docker ps -a -f status=dead -q) 2>/dev/null
+              docker rmi \$(docker images -f "dangling=true" -q) 2>/dev/null
+              set -e
+            """
+          }
+        }
+        stage('Build docker image') {
+          steps {
+            sh """
+              docker build --no-cache \
+                           -t ${CURRENT_BUILD_IMAGE_NAME} \
+                           -t ${TIMESTAMPED_IMAGE_NAME} \
+                           -f docker-image/v0.12/debian-nfs/Dockerfile \
+                           docker-image/v0.12/debian-nfs
+            """
+          }
+        }
+      }
     }
 
-    stages {
-        stage("Clean up dangling images") {
-            steps {
-                sh """
-                    set +e
-                    docker rm \$(docker ps -a -f status=exited -q) 2>/dev/null
-                    docker rmi \$(docker images -f "dangling=true" -q) 2>/dev/null
-                    set -e
-                """
+    stage('Push Image to ECR') {
+      steps {
+        echo "Pushing ${IMAGE_NAME} tagged ${BRANCH_BUILD_TAG} and ${DATE_SHA_TAG}"
+        sh """
+          \$(aws ecr get-login --no-include-email --region us-east-1)
+          docker push ${CURRENT_BUILD_IMAGE_NAME}
+          docker push ${TIMESTAMPED_IMAGE_NAME}
+        """
+        /* Tag latest build for qe0*
+        script {
+            qe_nums = ['00', '01', '02', '03', '04', '05']
+            qe_nums.each { num ->
+              sh """
+                  docker tag ${CURRENT_BUILD_IMAGE_NAME} ${IMAGE_REPO}:qe${num}
+                  docker push ${IMAGE_REPO}:qe${num}
+              """
             }
         }
-        stage('Build fluentd debian-nfs image') {
-            steps {
-                script {
-                    GIT_COMMIT = sh(returnStdout: true, script: "git log -n 1 --pretty=format:'%h'").trim()
-                    STR_DATE = sh(returnStdout: true, script: "date +\"%y%m%d%H%M\"").trim()
-                    APP_TAG = "${STR_DATE}-${GIT_COMMIT}"
-                }
+        */
+      }
+    }
+  } /* stages */
 
-                sh """
-                    docker build -t $ECR_URL/fluentd -f docker-image/v0.12/debian-nfs/Dockerfile docker-image/v0.12/debian-nfs
-                """
-            }
-        }
-        stage('Push Image to ECR') {
-            steps {
-                  echo "Pushing fluentd"
-                  sh """
-                      \$(aws ecr get-login --no-include-email --region us-east-1)
-                      docker tag ${ECR_URL}/fluentd ${ECR_URL}/fluentd:${APP_TAG}
-                      docker push ${ECR_URL}/fluentd:${APP_TAG}
-                      docker tag ${ECR_URL}/fluentd ${ECR_URL}/fluentd:${ALT_TAG}
-                      docker push ${ECR_URL}/fluentd:${ALT_TAG}
-                  """
-                  /* Tag latest build for qe0*
-                  script {
-                      qe_nums = ['00', '01', '02', '03', '04', '05']
-                      qe_nums.each { num ->
-                        sh """
-                            docker tag ${ECR_URL}/fluentd ${ECR_URL}/fluentd:qe${num}
-                            docker push ${ECR_URL}/fluentd:qe${num}
-                        """
-                      }
-                  }
-                  */
-            }
-        }
+  post {
+    always {
+      echo 'Clean up any built/tagged images'
+      sh """
+        docker rmi -f ${TIMESTAMPED_IMAGE_NAME} >/dev/null 2>&1
+        docker rmi -f ${CURRENT_BUILD_IMAGE_NAME} >/dev/null 2>&1
+      """
     }
 
-    post {
-        always {
-            echo 'test cf jenkins pipeline'
-        }
-
-        failure {
-            emailext (
-                to: 'engineers@crowdflower.com',
-                subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
-                body: """
-                <p>FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
-                <p>Check console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a></p>
-                """,
-                recipientProviders: [[$class: 'DevelopersRecipientProvider']]
-            )
-        }
+    failure {
+      emailext (
+        to: "${ERROR_EMAIL}",
+        subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
+        body: """
+        <p>FAILED: Jenkins Job '${JOB_NAME} [${BUILD_NUMBER}]'</p>
+        <p>Check console output at <a href='${BUILD_URL}'>${BUILD_URL}</a></p>
+        """,
+        recipientProviders: [[$class: 'DevelopersRecipientProvider']]
+      )
     }
+  }
 }
