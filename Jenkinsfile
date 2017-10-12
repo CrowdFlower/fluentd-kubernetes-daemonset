@@ -10,11 +10,13 @@ pipeline {
     BRANCH_BUILD_TAG = "${BRANCH_NAME.replace('/','-')}-${BUILD_NUMBER}"
     GIT_SHA7 = "${GIT_COMMIT[0..6]}"
     TIMESTAMP = "${new Date(currentBuild.startTimeInMillis).format("yyMMddHHmm")}"
-    DATE_SHA_TAG = "v0.12-debian-nfs-$TIMESTAMP-$GIT_SHA7"
+    DATE_SHA_TAG = "$TIMESTAMP-$GIT_SHA7"
+    VARIANT_TAG = "v0.12-debian-nfs-$GIT_SHA7"
     ECR_URL = '411719562396.dkr.ecr.us-east-1.amazonaws.com'
     IMAGE_REPO = "$ECR_URL/$IMAGE_NAME"
     CURRENT_BUILD_IMAGE_NAME = "$IMAGE_REPO:$BRANCH_BUILD_TAG"
     TIMESTAMPED_IMAGE_NAME = "$IMAGE_REPO:$DATE_SHA_TAG"
+    VARIANT_IMAGE_NAME = "$IMAGE_REPO:$VARIANT_TAG"
     ERROR_EMAIL = 'engineers@crowdflower.com'
   }
 
@@ -48,6 +50,7 @@ pipeline {
               docker build --no-cache \
                            -t ${CURRENT_BUILD_IMAGE_NAME} \
                            -t ${TIMESTAMPED_IMAGE_NAME} \
+                           -t ${VARIANT_IMAGE_NAME} \
                            -f docker-image/v0.12/debian-nfs/Dockerfile \
                            docker-image/v0.12/debian-nfs
             """
@@ -58,11 +61,12 @@ pipeline {
 
     stage('Push Image to ECR') {
       steps {
-        echo "Pushing ${IMAGE_NAME} tagged ${BRANCH_BUILD_TAG} and ${DATE_SHA_TAG}"
+        echo "Pushing ${IMAGE_NAME} tagged ${BRANCH_BUILD_TAG} and ${DATE_SHA_TAG} and ${VARIANT_IMAGE_NAME}"
         sh """
           \$(aws ecr get-login --no-include-email --region us-east-1)
           docker push ${CURRENT_BUILD_IMAGE_NAME}
           docker push ${TIMESTAMPED_IMAGE_NAME}
+          docker push ${VARIANT_IMAGE_NAME}
         """
         /* Tag latest build for qe0*
         script {
@@ -83,6 +87,7 @@ pipeline {
     always {
       echo 'Clean up any built/tagged images'
       sh """
+        docker rmi -f ${VARIANT_IMAGE_NAME} >/dev/null 2>&1
         docker rmi -f ${TIMESTAMPED_IMAGE_NAME} >/dev/null 2>&1
         docker rmi -f ${CURRENT_BUILD_IMAGE_NAME} >/dev/null 2>&1
       """
