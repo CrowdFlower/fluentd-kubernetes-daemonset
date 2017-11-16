@@ -47,6 +47,7 @@ pipeline {
         stage('Build docker image') {
           steps {
             sh """
+              \$(aws ecr get-login --no-include-email --region us-east-1)
               docker build --no-cache \
                            -t ${CURRENT_BUILD_IMAGE_NAME} \
                            -t ${TIMESTAMPED_IMAGE_NAME} \
