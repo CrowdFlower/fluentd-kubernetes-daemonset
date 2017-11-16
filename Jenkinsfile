@@ -17,6 +17,7 @@ pipeline {
     CURRENT_BUILD_IMAGE_NAME = "$IMAGE_REPO:$BRANCH_BUILD_TAG"
     TIMESTAMPED_IMAGE_NAME = "$IMAGE_REPO:$DATE_SHA_TAG"
     VARIANT_IMAGE_NAME = "$IMAGE_REPO:$VARIANT_TAG"
+    SCAN_IMAGE_NAME = "$IMAGE_REPO:cfsecure-cve"
     ERROR_EMAIL = 'engineers@crowdflower.com'
   }
 
@@ -52,6 +53,7 @@ pipeline {
                            -t ${CURRENT_BUILD_IMAGE_NAME} \
                            -t ${TIMESTAMPED_IMAGE_NAME} \
                            -t ${VARIANT_IMAGE_NAME} \
+                           -t ${SCAN_IMAGE_NAME} \
                            -f docker-image/v0.12/debian-nfs/Dockerfile \
                            docker-image/v0.12/debian-nfs
             """
@@ -68,6 +70,7 @@ pipeline {
           docker push ${CURRENT_BUILD_IMAGE_NAME}
           docker push ${TIMESTAMPED_IMAGE_NAME}
           docker push ${VARIANT_IMAGE_NAME}
+          docker push ${SCAN_IMAGE_NAME}
         """
         /* Tag latest build for qe0*
         script {
@@ -88,6 +91,7 @@ pipeline {
     always {
       echo 'Clean up any built/tagged images'
       sh """
+        docker rmi -f ${SCAN_IMAGE_NAME} >/dev/null 2>&1
         docker rmi -f ${VARIANT_IMAGE_NAME} >/dev/null 2>&1
         docker rmi -f ${TIMESTAMPED_IMAGE_NAME} >/dev/null 2>&1
         docker rmi -f ${CURRENT_BUILD_IMAGE_NAME} >/dev/null 2>&1
