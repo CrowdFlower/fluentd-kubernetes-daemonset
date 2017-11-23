@@ -41,6 +41,7 @@ RUN apt-get update \
       && export GNUPGHOME="$(mktemp -d)" \
       && keyId=B42F6819007F00F88E364FD4036A9C25BF357DD4 \
       && ( gpg --keyserver ha.pool.sks-keyservers.net --recv-keys $keyId \
+        || gpg --keyserver ipv4.pool.sks-keyservers.net --recv-keys $keyId \
         || gpg --keyserver pgp.mit.edu --recv-keys $keyId \
         || gpg --keyserver keyserver.pgp.com --recv-keys $keyId \
         || gpg --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys $keyId ) \
